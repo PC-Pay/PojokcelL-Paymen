@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1a73e8">
+    <title>Pencatatan Digital</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --primary: #1a73e8; --dark: #0d47a1; --bg: #f2f5f8; --text: #333; --red: #e74c3c; --green: #2e7d32; --orange: #f39c12; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+
+        .app-header {
+            background: linear-gradient(135deg, var(--primary), var(--dark));
+            color: white; padding: 50px 20px 50px; border-bottom: 4px solid rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .app-header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; font-weight: 700; }
+        .app-header p { margin: 5px 0 0; font-size: 11px; opacity: 0.8; }
+
+        .stats { display: flex; gap: 8px; margin: -35px 15px 20px; position: relative; z-index: 11; }
+        .stat-card { flex: 1; background: white; padding: 12px; border-radius: 12px; text-align: center; border: 1px solid #eee; box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+        .stat-card small { font-size: 9px; color: #888; display: block; text-transform: uppercase; margin-bottom: 4px; }
+        .stat-card b { font-size: 11px; color: var(--primary); }
+
+        .grid-prov { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 15px 20px; position: relative; z-index: 10; }
+        .prov-box { background: white; aspect-ratio: 1/1; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); font-size: 9px; font-weight: 600; border: 1px solid #eee; cursor: pointer; }
+        .prov-box img { width: 32px; height: 32px; object-fit: contain; margin-bottom: 5px; }
+
+        .view { display: none; height: 100vh; width: 100%; overflow-y: auto; padding-bottom: 120px; }
+        .view.active { display: block; }
+        
+        .swipe-container { position: relative; overflow: hidden; background: #fff; margin-bottom: 1px; border-bottom: 1px solid #f0f0f0; }
+        .swipe-actions { position: absolute; right: 0; top: 0; bottom: 0; display: flex; width: 160px; z-index: 1; }
+        .action-btn { flex: 1; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 800; }
+
+        .trx-item { 
+            background: white; padding: 15px 20px; display: flex; align-items: center; gap: 15px;
+            position: relative; z-index: 2; transition: transform 0.3s ease; touch-action: pan-y;
+        }
+        .trx-icon {
+            width: 42px; height: 42px; background: #e8f0fe; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: var(--primary); font-size: 16px; flex-shrink: 0;
+            text-transform: uppercase;
+        }
+        .trx-info { flex-grow: 1; }
+        .trx-pembeli { font-size: 14px; font-weight: 700; color: #222; }
+        .trx-status { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--green); font-weight: 600; margin: 2px 0; }
+        .trx-status::before { content: "●"; font-size: 8px; }
+        .trx-meta { font-size: 10px; color: #999; }
+        .trx-amount { text-align: right; }
+        .trx-jual { font-size: 14px; font-weight: 800; }
+        .trx-laba { font-size: 9px; color: #777; background: #f0f0f0; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+
+        .rekap-container { background: white; margin: 15px; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px; }
+        th { background: #f8f9fa; padding: 12px 10px; text-align: left; border-bottom: 2px solid #eee; color: #666; font-size: 10px; text-transform: uppercase; }
+        td { padding: 12px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        
+        .card { background: white; margin: 15px; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        input, select { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        .btn { background: var(--primary); color: white; border: none; width: 100%; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; height: 60px; background: white; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
+        .nav-item { text-align: center; color: #999; font-size: 10px; cursor: pointer; flex: 1; }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-item i { font-size: 20px; display: block; margin-bottom: 2px; font-style: normal; }
+        
+        .fab { position: fixed; bottom: 80px; right: 20px; width: 60px; height: 60px; background: var(--dark); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 6px 15px rgba(0,0,0,0.3); border: none; }
+        .search-bar { background: #fff; padding: 10px 15px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #eee; }
+
+        /* STYLE SETTING MODEREN */
+        .setting-list { background: white; margin: 15px; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .setting-item { display: flex; align-items: center; padding: 18px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
+        .setting-item:active { background: #fafafa; }
+        .setting-item i { font-style: normal; font-size: 20px; margin-right: 15px; }
+        .setting-item .label { flex: 1; font-size: 14px; font-weight: 600; color: #333; }
+        .setting-item .arrow { color: #ccc; font-weight: bold; }
+        
+        .panel-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; }
+        .panel { position: fixed; bottom: -100%; left: 0; right: 0; background: white; border-radius: 20px 20px 0 0; padding: 25px; transition: 0.3s ease; z-index: 2001; max-height: 85vh; overflow-y: auto; }
+        .panel.show { bottom: 0; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .panel-header h3 { margin: 0; font-size: 18px; }
+        .close-panel { font-size: 24px; cursor: pointer; color: #999; }
+    </style>
+</head>
+<body>
+    <div id="view-home" class="view active">
+        <div class="app-header">
+            <h1 id="txt-nama-toko">POJOKCELL</h1>
+            <p>Pencatatan Digital</p>
+        </div>
+        <div class="stats">
+            <div class="stat-card"><small>Modal</small><b id="st-modal">Rp0</b></div>
+            <div class="stat-card"><small>Omzet</small><b id="st-jual">Rp0</b></div>
+            <div class="stat-card"><small>Laba</small><b id="st-laba" style="color: var(--green);">Rp0</b></div>
+        </div>
+        <div class="grid-prov">
+            <div class="prov-box" onclick="openPriceList('Axis')"><img src="axis.png">Axis</div>
+            <div class="prov-box" onclick="openPriceList('Smartfren')"><img src="smartfren.png">Smartfren</div>
+            <div class="prov-box" onclick="openPriceList('Indosat')"><img src="indosat.png">Indosat</div>
+            <div class="prov-box" onclick="openPriceList('Three')"><img src="three.png">Three</div>
+            <div class="prov-box" onclick="openPriceList('XL')"><img src="xl.png">XL</div>
+            <div class="prov-box" onclick="openPriceList('Telkomsel')"><img src="telkomsel.png">telkomsel</div>
+            <div class="prov-box" onclick="openPriceList('Voucher')"><img src="voucher.png">Voucher</div>
+            <div class="prov-box" onclick="openPriceList('Game')"><img src="ff.png">Free fire</div>
+        </div>
+        <h3 style="margin: 0 20px 10px; font-size: 14px; color: #555;">Riwayat Hari Ini</h3>
+        <div id="recent-list" style="background: white; margin: 0 15px; border-radius: 12px; overflow: hidden;"></div>
+    </div>
+
+    <div id="view-prices" class="view">
+        <div class="app-header" style="padding-bottom: 20px;"><h1 id="price-title">Daftar Harga</h1></div>
+        <div class="search-bar"><input type="text" id="search-price" placeholder="Cari Produk..." onkeyup="filterPriceTable()" style="margin-bottom:0"></div>
+        <div class="rekap-container">
+            <div class="table-wrap"><table id="price-table"><thead><tr><th>KODE</th><th>PRODUK</th><th>HARGA</th></tr></thead><tbody id="price-table-body"></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="view-kasir" class="view">
+        <div class="app-header" style="padding-bottom: 20px;"><h1>Input Kasir</h1></div>
+        <div class="card">
+            <input type="hidden" id="in-id">
+            <input type="text" id="in-pembeli" placeholder="Nama Pembeli">
+            <input type="text" id="in-produk" placeholder="Nama Produk">
+            <div style="display: flex; gap: 10px;"><input type="number" id="in-modal" placeholder="Harga Modal"><input type="number" id="in-jual" placeholder="Harga Jual"></div>
+            <input type="date" id="in-tgl"><button class="btn" id="btn-simpan" onclick="simpanTransaksi()">SIMPAN TRANSAKSI</button>
+        </div>
+    </div>
+
+    <div id="view-rekap" class="view">
+        <div class="app-header" style="padding-bottom: 20px;"><h1>Rekap Penjualan</h1></div>
+        <div class="card" style="margin-bottom: 5px;"><small>Filter Bulan:</small><input type="month" id="filter-bulan" onchange="renderAll()"></div>
+        <div class="rekap-container">
+            <div class="table-wrap"><table id="main-table"><thead><tr><th>TGL</th><th>PEMBELI</th><th>MODAL</th><th>JUAL</th><th>LABA</th></tr></thead><tbody id="rekap-table-body"></tbody><tfoot id="rekap-footer"></tfoot></table></div>
+        </div>
+        <button class="fab" onclick="nativeShareLaporan()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </button>
+    </div>
+
+    <div id="view-settings" class="view">
+        <div class="app-header" style="padding-bottom: 20px;"><h1>Pengaturan</h1></div>
+        <div class="setting-list">
+            <div class="setting-item" onclick="openPanel('panel-master')"><i>🏷️</i><div class="label">Kelola Master Harga</div><div class="arrow">></div></div>
+            <div class="setting-item" onclick="openPanel('panel-toko')"><i>🏪</i><div class="label">Nama Toko</div><div class="arrow">></div></div>
+            <div class="setting-item" onclick="resetData()" style="border:none"><i style="color:var(--red)">🗑️</i><div class="label" style="color:var(--red)">Reset Database Transaksi</div><div class="arrow">></div></div>
+        </div>
+        <p style="text-align:center; color:#999; font-size:10px; margin-top:20px;">App v3.0</p>
+    </div>
+
+    <div class="panel-overlay" id="p-overlay" onclick="closePanel()"></div>
+    <div class="panel" id="panel-master">
+        <div class="panel-header"><h3>Input Master Harga</h3><span class="close-panel" onclick="closePanel()">&times;</span></div>
+        <select id="m-prov">
+            <option value="Axis">Axis</option><option value="Smartfren">Smartfren</option><option value="Indosat">Indosat</option>
+            <option value="Three">Three</option><option value="XL">XL</option><option value="Telkomsel">Telkomsel</option>
+            <option value="Voucher">Voucher</option><option value="Game">Game</option>
+        </select>
+        <input type="text" id="m-kode" placeholder="Kode (AX1)">
+        <input type="text" id="m-nama" placeholder="Nama Produk (Axis 1GB)">
+        <input type="text" id="m-jenis" placeholder="Jenis (Voucher/Inject)">
+        <input type="number" id="m-harga" placeholder="Harga Jual">
+        <button class="btn" style="background:var(--green)" onclick="simpanMasterHarga()">TAMBAH DATA</button>
+    </div>
+    <div class="panel" id="panel-toko">
+        <div class="panel-header"><h3>Nama Toko</h3><span class="close-panel" onclick="closePanel()">&times;</span></div>
+        <input type="text" id="set-toko-input" placeholder="Masukkan Nama Toko">
+        <button class="btn" onclick="updateToko()">SIMPAN NAMA</button>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i>🏠</i>Beranda</div>
+        <div class="nav-item" id="nav-kasir" onclick="switchTab('kasir')"><i>🛒</i>Kasir</div>
+        <div class="nav-item" id="nav-rekap" onclick="switchTab('rekap')"><i>🗓️</i>Rekap</div>
+        <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><i>⚙️</i>Setting</div>
+    </div>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('PojokDB_Clean')) || [];
+        let settings = JSON.parse(localStorage.getItem('PojokSet_Clean')) || { nama: "POJOKCELL" };
+        let masterHarga = JSON.parse(localStorage.getItem('PojokMaster_Harga')) || {};
+
+        function init() {
+            document.getElementById('txt-nama-toko').innerText = settings.nama;
+            document.getElementById('in-tgl').value = new Date().toISOString().split('T')[0];
+            document.getElementById('filter-bulan').value = new Date().toISOString().slice(0, 7);
+            window.history.replaceState({ tab: 'home' }, 'home', '');
+            renderAll();
+        }
+
+        function openPanel(id) { document.getElementById('p-overlay').style.display = 'block'; document.querySelectorAll('.panel').forEach(p => p.classList.remove('show')); document.getElementById(id).classList.add('show'); }
+        function closePanel() { document.getElementById('p-overlay').style.display = 'none'; document.querySelectorAll('.panel').forEach(p => p.classList.remove('show')); }
+
+        function simpanMasterHarga() {
+            const prov = document.getElementById('m-prov').value;
+            const data = { k: document.getElementById('m-kode').value.toUpperCase(), n: document.getElementById('m-nama').value, v: document.getElementById('m-jenis').value, h: parseInt(document.getElementById('m-harga').value) || 0 };
+            if(!data.k || !data.n || !data.h) return alert("Lengkapi data!");
+            if(!masterHarga[prov]) masterHarga[prov] = [];
+            masterHarga[prov].push(data);
+            localStorage.setItem('PojokMaster_Harga', JSON.stringify(masterHarga));
+            alert("Berhasil ditambah!");
+            document.getElementById('m-kode').value = ""; document.getElementById('m-nama').value = ""; document.getElementById('m-jenis').value = ""; document.getElementById('m-harga').value = "";
+            closePanel();
+        }
+
+        function openPriceList(prov) {
+            document.getElementById('price-title').innerText = "Harga " + prov;
+            const tbody = document.getElementById('price-table-body'); tbody.innerHTML = "";
+            const list = masterHarga[prov] || [];
+            if(list.length === 0) tbody.innerHTML = "<tr><td colspan='3' style='text-align:center'>Belum ada data. Input di Setting.</td></tr>";
+            else list.forEach(item => { tbody.innerHTML += `<tr><td><code>${item.k}</code></td><td><b>${item.n}</b><br><small>${item.v}</small></td><td style="color:var(--primary); font-weight:bold">Rp${item.h.toLocaleString()}</td></tr>`; });
+            switchTab('prices');
+        }
+
+        function filterPriceTable() {
+            let input = document.getElementById('search-price').value.toUpperCase();
+            let rows = document.getElementById('price-table-body').getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) { let text = rows[i].textContent || rows[i].innerText; rows[i].style.display = text.toUpperCase().indexOf(input) > -1 ? "" : "none"; }
+        }
+
+        function switchTab(tab, pushState = true) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('view-' + tab).classList.add('active');
+            document.getElementById('nav-' + tab).classList.add('active');
+            if(pushState && tab !== 'home') window.history.pushState({ tab: tab }, tab, '');
+        }
+
+        window.onpopstate = (e) => switchTab(e.state ? e.state.tab : 'home', false);
+
+        function simpanTransaksi() {
+            const id = document.getElementById('in-id').value;
+            const data = { id: id ? parseInt(id) : Date.now(), pembeli: document.getElementById('in-pembeli').value || "Umum", produk: document.getElementById('in-produk').value, modal: parseInt(document.getElementById('in-modal').value) || 0, jual: parseInt(document.getElementById('in-jual').value) || 0, tgl: document.getElementById('in-tgl').value };
+            if(!data.produk || !data.jual) return alert("Isi Produk & Jual!");
+            if(id) db[db.findIndex(x => x.id === parseInt(id))] = data; else db.push(data);
+            localStorage.setItem('PojokDB_Clean', JSON.stringify(db));
+            renderAll(); switchTab('home');
+            document.getElementById('in-id').value = ""; document.getElementById('in-pembeli').value = ""; document.getElementById('in-produk').value = ""; document.getElementById('in-modal').value = ""; document.getElementById('in-jual').value = "";
+        }
+
+        function renderAll() {
+            let tm=0, tj=0, tl=0, r_tm=0, r_tj=0, r_tl=0;
+            const rList = document.getElementById('recent-list');
+            const rTable = document.getElementById('rekap-table-body');
+            const filterBulan = document.getElementById('filter-bulan').value;
+            const hariIni = new Date().toISOString().split('T')[0]; // Ambil tanggal hari ini
+            
+            rList.innerHTML = ""; rTable.innerHTML = "";
+            const sorted = [...db].sort((a,b) => new Date(b.tgl) - new Date(a.tgl));
+            
+            sorted.forEach((x) => {
+                const untung = x.jual - x.modal; 
+                tm += x.modal; tj += x.jual; tl += untung;
+                
+                // FILTER: Hanya tampilkan di Beranda jika tanggal transaksi = hari ini
+                if(x.tgl === hariIni) {
+                    rList.innerHTML += `<div class="swipe-container"><div class="swipe-actions"><div class="action-btn" style="background:#25d366" onclick="kirimWA('${x.pembeli}','${x.produk}',${x.jual})">WA</div><div class="action-btn" style="background:var(--orange)" onclick="editItem(${x.id})">EDIT</div><div class="action-btn" style="background:var(--red)" onclick="hapusSatu(${x.id})">HAPUS</div></div><div class="trx-item"><div class="trx-icon">${x.pembeli.charAt(0)}</div><div class="trx-info"><div class="trx-pembeli">${x.pembeli}</div><div class="trx-status">Transaksi Berhasil</div><div class="trx-meta">${x.tgl} • ${x.produk}</div></div><div class="trx-amount"><div class="trx-jual">Rp${x.jual.toLocaleString()}</div><div class="trx-laba">Laba Rp${untung.toLocaleString()}</div></div></div></div>`;
+                }
+                
+                if(x.tgl.startsWith(filterBulan)) {
+                    r_tm += x.modal; r_tj += x.jual; r_tl += untung;
+                    rTable.innerHTML += `<tr><td style="color:#888">${x.tgl.split('-')[2]}</td><td><b>${x.pembeli}</b><br><small>${x.produk}</small></td><td>${x.modal.toLocaleString()}</td><td>${x.jual.toLocaleString()}</td><td style="color:var(--green); font-weight:bold;">${untung.toLocaleString()}</td></tr>`;
+                }
+            });
+            
+            if(rList.innerHTML === "") rList.innerHTML = "<div style='padding:20px; text-align:center; color:#999; font-size:12px;'>Belum ada transaksi hari ini.</div>";
+            
+            document.getElementById('rekap-footer').innerHTML = `<tr style="background:#e8f0fe; font-weight:800"><td colspan="2">TOTAL</td><td>${r_tm.toLocaleString()}</td><td>${r_tj.toLocaleString()}</td><td style="color:var(--green)">${r_tl.toLocaleString()}</td></tr>`;
+            document.getElementById('st-modal').innerText = "Rp" + tm.toLocaleString();
+            document.getElementById('st-jual').innerText = "Rp" + tj.toLocaleString();
+            document.getElementById('st-laba').innerText = "Rp" + tl.toLocaleString();
+            initSwipeEvents();
+        }
+
+        async function nativeShareLaporan() { const filter = document.getElementById('filter-bulan').value; const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.text(settings.nama, 14, 20); doc.text(`Rekap: ${filter}`, 14, 28); doc.autoTable({ html: '#main-table', startY: 35 }); const pdfBlob = doc.output('blob'); const file = new File([pdfBlob], `REKAP.pdf`, {type:'application/pdf'}); if(navigator.share) await navigator.share({ files: [file], title: 'Laporan' }); else doc.save('REKAP.pdf'); }
+
+        function initSwipeEvents() { let startX = 0; document.querySelectorAll('.trx-item').forEach(el => { el.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }); el.addEventListener('touchmove', e => { let diff = e.touches[0].clientX - startX; if(diff < 0 && diff > -160) el.style.transform = `translateX(${diff}px)`; }); el.addEventListener('touchend', e => { let diff = e.changedTouches[0].clientX - startX; el.style.transform = diff < -80 ? 'translateX(-160px)' : 'translateX(0)'; }); }); }
+        function editItem(id) { const item = db.find(x => x.id === id); if(item) { document.getElementById('in-id').value = item.id; document.getElementById('in-pembeli').value = item.pembeli; document.getElementById('in-produk').value = item.produk; document.getElementById('in-modal').value = item.modal; document.getElementById('in-jual').value = item.jual; document.getElementById('in-tgl').value = item.tgl; switchTab('kasir'); } }
+        function kirimWA(p, pr, j) { window.open(`https://wa.me/?text=${encodeURIComponent(`*STRUK ${settings.nama}*\nPelanggan: ${p}\nProduk: ${pr}\nHarga: Rp${j.toLocaleString()}`)}`); }
+        function hapusSatu(id) { if(confirm("Hapus?")) { db = db.filter(x => x.id !== id); localStorage.setItem('PojokDB_Clean', JSON.stringify(db)); renderAll(); } }
+        function updateToko() { let n = document.getElementById('set-toko-input').value; if(n) { settings.nama = n.toUpperCase(); localStorage.setItem('PojokSet_Clean', JSON.stringify(settings)); init(); switchTab('home'); closePanel(); } }
+        function resetData() { if(confirm("Reset semua transaksi?")) { db = []; localStorage.setItem('PojokDB_Clean', JSON.stringify(db)); renderAll(); } }
+
+        init();
+    </script>
+</body>
+</html>
